@@ -7,6 +7,7 @@ import org.springframework.security.config.annotation.web.configuration.WebSecur
 @SuppressWarnings("deprecation")
 @EnableWebSecurity
 public class SecurityConfig extends WebSecurityConfigurerAdapter{
+	
 	@Override
 	public void configure(HttpSecurity httpSecurity) throws Exception{
 		httpSecurity.csrf().disable()
