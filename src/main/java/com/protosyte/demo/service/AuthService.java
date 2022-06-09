@@ -3,7 +3,10 @@ package com.protosyte.demo.service;
 import java.time.Instant;
 import java.util.UUID;
 
+import javax.transaction.Transactional;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.protosyte.demo.dto.RegisterRequest;
@@ -18,11 +21,14 @@ public class AuthService {
 	UserRepository userRepository;
 	@Autowired
 	VerificationTokenRepository verificationTokenRepository;
+	@Autowired 
+	PasswordEncoder passwordEncoder;
 	
+	@Transactional
 	public void signup(RegisterRequest registerRequest) {
 		User user = new User();
 		user.setUsername(registerRequest.getUsername());
-		user.setPassword(registerRequest.getPassword()); //todo: add encryption
+		user.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
 		user.setEmail(registerRequest.getEmail());
 		user.setCreated(Instant.now());
 		user.setEnabled(false);
