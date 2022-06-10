@@ -1,6 +1,7 @@
 package com.protosyte.demo.service;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 import javax.transaction.Transactional;
@@ -10,6 +11,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.protosyte.demo.dto.RegisterRequest;
+import com.protosyte.demo.exception.SpringRedditException;
 import com.protosyte.demo.model.NotificationEmail;
 import com.protosyte.demo.model.User;
 import com.protosyte.demo.model.VerificationToken;
@@ -50,6 +52,28 @@ public class AuthService {
 		
 		verificationTokenRepository.save(verificationToken);
 		return token;
-		
+	}
+	
+	public void verifyAccount(String token) {
+		Optional<VerificationToken> verificationToken = verificationTokenRepository.findByToken(token);
+//		verificationToken.orElseThrow(()-> new SpringRedditException("Invalid token"));
+		if(verificationToken.get() != null) {
+			fetchUserAndEnable(verificationToken.get());
+		}else {
+			throw new SpringRedditException("Invalid token");
+		}
+	}
+	
+	@Transactional
+	public void fetchUserAndEnable(VerificationToken token) {
+		String username = token.getUser().getUsername();
+		Optional<User> user = userRepository.findByUsername(username);
+		if(user.get() != null) {
+			user.get().setEnabled(true);
+			userRepository.save(user.get());
+		}else {
+			throw new SpringRedditException("Username associated to token not found");
+			
+		}
 	}
 }
