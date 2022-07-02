@@ -1,20 +1,27 @@
 package com.protosyte.demo.service;
 
+import java.text.SimpleDateFormat;
 import java.time.Instant;
+import java.util.Date;
 import java.util.Optional;
 import java.util.UUID;
 
 import javax.transaction.Transactional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.protosyte.demo.dto.LoginRequest;
 import com.protosyte.demo.dto.RegisterRequest;
+import com.protosyte.demo.dto.SessionLogin;
 import com.protosyte.demo.exception.SpringRedditException;
 import com.protosyte.demo.model.NotificationEmail;
 import com.protosyte.demo.model.User;
 import com.protosyte.demo.model.VerificationToken;
+import com.protosyte.demo.repository.SessionRepository;
 import com.protosyte.demo.repository.UserRepository;
 import com.protosyte.demo.repository.VerificationTokenRepository;
 
@@ -28,6 +35,10 @@ public class AuthService {
 	PasswordEncoder passwordEncoder;
 	@Autowired
 	private MailService mailService;
+	@Autowired
+	SessionRepository sessionRepository;
+	
+	private static Logger logger = LoggerFactory.getLogger(AuthService.class);
 	
 	@Transactional
 	public void signup(RegisterRequest registerRequest) {
@@ -75,5 +86,40 @@ public class AuthService {
 			throw new SpringRedditException("Username associated to token not found");
 			
 		}
+	}
+
+	@Transactional
+	public void login(LoginRequest loginRequest) {
+		//check login data == users table data
+		//if login ok, saves a session object into session table
+		//every page that requires authentication needs the session object passed too, along which everything else
+		//i.e.: /search will require the session (see logout), the string you are searching for, and the others params.
+		//i.e.: /home will require the session (see logout) and nothing else.	
+		//If the session is not valid (checks session.getUsername,sessionLoginId == users table & session table)
+		SessionLogin session = new SessionLogin();
+		
+		SimpleDateFormat formatter= new SimpleDateFormat("yyyy-MM-dd 'at' HH:mm:ss z");
+		Date dateNow = new Date(System.currentTimeMillis());
+		
+		String sessionId = loginRequest.getUsername() + passwordEncoder.encode(loginRequest.getPassword()) + dateNow;
+		logger.info("session login for user {}: {}",loginRequest.getUsername()+sessionId);
+		
+		logger.info("currentMs is while instant now returns: ",Instant.now());
+		
+		session.setSessionLoginId(sessionId);
+		session.setUsername(loginRequest.getUsername());
+//		session.setSessionLoginDate(dateNow);
+		
+		
+		sessionRepository.save(session);
+		
+	}
+	
+	@Transactional
+	public void logout(SessionLogin sessionLogin) {
+		//destroys sessionLogin
+		//SQL delete from session table where sessionLoginId = %s, sessionLogin.getSessionLoginId()
+		
+		//todo
 	}
 }

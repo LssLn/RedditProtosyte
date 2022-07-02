@@ -10,7 +10,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.protosyte.demo.dto.LoginRequest;
 import com.protosyte.demo.dto.RegisterRequest;
+import com.protosyte.demo.dto.SessionLogin;
 import com.protosyte.demo.service.AuthService;
 
 @RestController
@@ -29,5 +31,17 @@ public class AuthController {
 	public ResponseEntity<String> verifyAccount(@PathVariable String token){
 		authService.verifyAccount(token);
 		return new ResponseEntity<>("Account successfully activated", HttpStatus.OK);
+	}
+	
+	@PostMapping("/login")
+	public ResponseEntity<String> login(@RequestBody LoginRequest loginRequest) {
+		authService.login(loginRequest);
+		return new ResponseEntity<>("User logged in as "+loginRequest.getUsername(), HttpStatus.OK);
+	}
+	
+	@PostMapping("/logout")
+	public ResponseEntity<String> logout(@RequestBody SessionLogin sessionLogin) {
+		authService.logout(sessionLogin);
+		return new ResponseEntity<>("User "+sessionLogin.getUsername()+" logged out", HttpStatus.OK);
 	}
 }
