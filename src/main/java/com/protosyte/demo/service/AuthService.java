@@ -1,24 +1,33 @@
 package com.protosyte.demo.service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.util.Date;
 import java.util.Optional;
 import java.util.UUID;
 
+import javax.persistence.EntityManager;
+import javax.persistence.Query;
 import javax.transaction.Transactional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.protosyte.demo.dto.EncrypterDto;
 import com.protosyte.demo.dto.LoginRequest;
 import com.protosyte.demo.dto.RegisterRequest;
 import com.protosyte.demo.dto.SessionLoginRequest;
 import com.protosyte.demo.exception.SpringRedditException;
 import com.protosyte.demo.model.NotificationEmail;
+import com.protosyte.demo.model.SessionLogin;
 import com.protosyte.demo.model.User;
 import com.protosyte.demo.model.VerificationToken;
 import com.protosyte.demo.repository.SessionRepository;
@@ -37,24 +46,58 @@ public class AuthService {
 	private MailService mailService;
 	@Autowired
 	SessionRepository sessionRepository;
+	@Autowired
+	private EntityManager entityManager;
+
 	
 	private static Logger logger = LoggerFactory.getLogger(AuthService.class);
+	
 	
 	@Transactional
 	public void signup(RegisterRequest registerRequest) {
 		User user = new User();
 		user.setUsername(registerRequest.getUsername());
-		user.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
-		user.setEmail(registerRequest.getEmail());
-		user.setCreated(Instant.now());
-		user.setEnabled(false);
-		
-		userRepository.save(user);
-		String token = generateVerificationToken(user);
-		mailService.sendMail(new NotificationEmail("Please activare your account, ",user.getEmail(),"Thank you for signing up to RedditProtosyte."+ "\nPlease click on the link below to activate your account: "+ "http://localhost:8080/api/auth/accountVerification/" + token));
+//		user.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
+		try {
+			SecureRandom random = new SecureRandom();
+			byte[] salt = new byte[16];
+			random.nextBytes(salt);
+			logger.info(" -- salt: {}",salt);
+
+//			ByteArrayResource saltBAR = new ByteArrayResource(salt);
+//			logger.info(" -- saltStr: {}",saltBAR);
+//			logger.info(" -- saltStr.toString: {}",saltBAR.toString());
+			
+			byte[] hashedPw  = passwordEncryption(registerRequest.getPassword(), salt);
+			logger.info(" -- hashedPW: {}",hashedPw);
+			
+			user.setPassword(hashedPw);
+			user.setEmail(registerRequest.getEmail());
+			user.setCreated(Instant.now());
+			user.setEnabled(false);
+			user.setSalt(salt);
+			
+			userRepository.save(user);
+			String token = generateVerificationToken(user);
+			mailService.sendMail(new NotificationEmail("Please activare your account, ",user.getEmail(),"Thank you for signing up to RedditProtosyte."+ "\nPlease click on the link below to activate your account: "+ "http://localhost:8080/api/auth/accountVerification/" + token));
+			
+		}catch(NoSuchAlgorithmException e) {
+			logger.error("NoSuchAlgorithmException during encryption: {}",e);
+		}
 		
 	}
 	
+	private byte[] passwordEncryption(String password, byte[] salt) throws NoSuchAlgorithmException {
+		
+		MessageDigest md = MessageDigest.getInstance("SHA-512");
+		md.update(salt);
+		
+		byte[] hashedPassword = md.digest(password.getBytes(StandardCharsets.UTF_8));
+		logger.info(" -- hashedPW: {}",hashedPassword);
+
+		return hashedPassword;
+	}
+
 	private String generateVerificationToken(User user) {
 		String token = UUID.randomUUID().toString();
 		VerificationToken verificationToken = new VerificationToken();
@@ -90,31 +133,91 @@ public class AuthService {
 
 	@Transactional
 	public void login(LoginRequest loginRequest) {
-		//check login data == users table data
-		//if login ok, saves a session object into session table
-		//every page that requires authentication needs the session object passed too, along which everything else
-		//i.e.: /search will require the session (see logout), the string you are searching for, and the others params.
-		//i.e.: /home will require the session (see logout) and nothing else.	
-		//If the session is not valid (checks session.getUsername,sessionLoginId == users table & session table)
-		SessionLoginRequest sessionLoginRequest = new SessionLoginRequest();
+		//check login data == users table data. If login is successful, save a session object into session table
 		
-		SimpleDateFormat formatter= new SimpleDateFormat("yyyy-MM-dd 'at' HH:mm:ss z");
-		Date dateNow = new Date(System.currentTimeMillis());
-		
-		String sessionId = loginRequest.getUsername() + passwordEncoder.encode(loginRequest.getPassword()) + dateNow;
-		logger.info("session login for user {}: {}",loginRequest.getUsername()+sessionId);
-		
-		logger.info("currentMs is while instant now returns: ",Instant.now());
-		
-		sessionLoginRequest.setSessionLoginId(sessionId);
-		sessionLoginRequest.setUsername(loginRequest.getUsername());
-//		session.setSessionLoginDate(dateNow);
-		
-		
-		sessionRepository.save(sessionLoginRequest);
-		
+		String saltStr = queryFindSaltByUsername(loginRequest.getUsername());
+		if(saltStr != null) {
+			byte[] salt = saltStr.getBytes(StandardCharsets.UTF_8);
+			try {
+				Boolean validLogin = queryLogin(loginRequest,salt);
+				//every page that requires authentication needs the session object passed too, along which everything else
+				//i.e.: /search will require the session (see logout), the string you are searching for, and the others params.
+				//i.e.: /home will require the session (see logout) and nothing else.	
+				//If the session is not valid (checks session.getUsername,sessionLoginId == users table & session table)
+				if(validLogin) {
+					SessionLogin sessionLogin = new SessionLogin();
+					
+					SimpleDateFormat formatter= new SimpleDateFormat("yyyy-MM-dd 'at' HH:mm:ss z");
+					Date dateNow = new Date(System.currentTimeMillis());
+					try {
+						String sessionId = loginRequest.getUsername() + passwordEncryption(loginRequest.getPassword(),salt) + dateNow;
+						logger.info("session login for user {}: {}",loginRequest.getUsername()+sessionId);
+						
+						logger.info("currentMs is "+dateNow+"while instant now returns: ",Instant.now());
+						
+						sessionLogin.setSessionLoginId(sessionId);
+						sessionLogin.setUsername(loginRequest.getUsername());
+//						session.setSessionLoginDate(dateNow);
+						
+						sessionRepository.save(sessionLogin);
+					}catch(Exception e) {
+						logger.error("Error encrypting password");
+					}
+					
+				}else {
+					logger.info("Login failed login not valid");
+					throw new SpringRedditException("Login failed.\nWrong username or password");
+					
+				}
+			}catch(Exception e) {
+				logger.error("Error encrypting no such algorithm");
+			}
+			
+		}else {
+			logger.info("Login failed salt is null");
+			throw new SpringRedditException("Login failed.\nNo such user exists");
+			
+		}
 	}
 	
+	private String queryFindSaltByUsername(String username) {
+		StringBuilder sb = new StringBuilder();
+		sb.append(String.format("SELECT user.salt FROM user "
+				+ "WHERE user.username='%s' "
+				,username));
+		try {
+			logger.info("findSaltQuery: {}",sb.toString());
+			Query query = entityManager.createNativeQuery(sb.toString(),String.class);
+			String result = query.getSingleResult().toString();
+			logger.info("salt returned: {}",result);
+			return result;
+		}catch(Exception e) {
+			logger.error("SQL Exception attempting salt retrieval");
+		}
+		return null;
+	}
+
+	private Boolean queryLogin(LoginRequest loginRequest, byte[] salt) throws NoSuchAlgorithmException {
+		Boolean successfulLogin = false;
+		StringBuilder sb = new StringBuilder();
+		sb.append(String.format("SELECT count(*) FROM user "
+				+ "WHERE user.username='%s' "
+				+ "AND user.password='%s'", loginRequest.getUsername(), passwordEncryption(loginRequest.getPassword(),salt)));
+		try {
+			logger.info("LoginQuery: {}",sb.toString());
+			Query query = entityManager.createNativeQuery(sb.toString(),Integer.class);
+			Integer result = (Integer)query.getSingleResult();
+			logger.info("Login returned: {}",result);
+			if(result>0) {
+				successfulLogin=true;
+				return successfulLogin;
+			}
+		}catch(Exception e) {
+			logger.error("SQL Exception attempting login");
+		}
+		return successfulLogin;
+	}
+
 	@Transactional
 	public void logout(SessionLoginRequest sessionLoginRequest) {
 		//destroys sessionLogin

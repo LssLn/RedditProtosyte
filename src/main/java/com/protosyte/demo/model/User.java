@@ -9,6 +9,10 @@ import javax.persistence.Id;
 import javax.validation.constraints.Email;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotEmpty;
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Size;
+
+import org.springframework.core.io.ByteArrayResource;
 
 import lombok.Data;
 
@@ -20,7 +24,7 @@ public class User {
 	private Long userId;
 	@NotBlank(message="username is required")
 	private String username;
-	@NotBlank(message="password is required")
+	@NotEmpty(message="password required")
 	private String password;
 	
 	@Email
@@ -28,5 +32,5 @@ public class User {
 	private String email;
 	private Instant created;
 	private boolean enabled;
-	
+	private ByteArrayResource salt;
 }

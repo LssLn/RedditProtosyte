@@ -6,5 +6,4 @@ import lombok.Data;
 public class SessionLoginRequest {
 	private String sessionLoginId;
 	private String username;
-
 }

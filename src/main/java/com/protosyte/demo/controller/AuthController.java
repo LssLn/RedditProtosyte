@@ -42,6 +42,6 @@ public class AuthController {
 	@PostMapping("/logout")
 	public ResponseEntity<String> logout(@RequestBody SessionLoginRequest sessionLoginRequest) {
 		authService.logout(sessionLoginRequest);
-		return new ResponseEntity<>("User "+sessionLoginRequest.getUsername()+" logged out", HttpStatus.OK);
+		return new ResponseEntity<>("User "+sessionLoginRequest.getUsername()+" logged out.\nSession destroyed", HttpStatus.OK);
 	}
 }
