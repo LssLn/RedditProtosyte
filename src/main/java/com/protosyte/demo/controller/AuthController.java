@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.protosyte.demo.dto.LoginRequest;
 import com.protosyte.demo.dto.RegisterRequest;
-import com.protosyte.demo.dto.SessionLogin;
+import com.protosyte.demo.dto.SessionLoginRequest;
 import com.protosyte.demo.service.AuthService;
 
 @RestController
@@ -40,8 +40,8 @@ public class AuthController {
 	}
 	
 	@PostMapping("/logout")
-	public ResponseEntity<String> logout(@RequestBody SessionLogin sessionLogin) {
-		authService.logout(sessionLogin);
-		return new ResponseEntity<>("User "+sessionLogin.getUsername()+" logged out", HttpStatus.OK);
+	public ResponseEntity<String> logout(@RequestBody SessionLoginRequest sessionLoginRequest) {
+		authService.logout(sessionLoginRequest);
+		return new ResponseEntity<>("User "+sessionLoginRequest.getUsername()+" logged out", HttpStatus.OK);
 	}
 }

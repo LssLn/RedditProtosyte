@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 
 import com.protosyte.demo.dto.LoginRequest;
 import com.protosyte.demo.dto.RegisterRequest;
-import com.protosyte.demo.dto.SessionLogin;
+import com.protosyte.demo.dto.SessionLoginRequest;
 import com.protosyte.demo.exception.SpringRedditException;
 import com.protosyte.demo.model.NotificationEmail;
 import com.protosyte.demo.model.User;
@@ -96,7 +96,7 @@ public class AuthService {
 		//i.e.: /search will require the session (see logout), the string you are searching for, and the others params.
 		//i.e.: /home will require the session (see logout) and nothing else.	
 		//If the session is not valid (checks session.getUsername,sessionLoginId == users table & session table)
-		SessionLogin session = new SessionLogin();
+		SessionLoginRequest sessionLoginRequest = new SessionLoginRequest();
 		
 		SimpleDateFormat formatter= new SimpleDateFormat("yyyy-MM-dd 'at' HH:mm:ss z");
 		Date dateNow = new Date(System.currentTimeMillis());
@@ -106,17 +106,17 @@ public class AuthService {
 		
 		logger.info("currentMs is while instant now returns: ",Instant.now());
 		
-		session.setSessionLoginId(sessionId);
-		session.setUsername(loginRequest.getUsername());
+		sessionLoginRequest.setSessionLoginId(sessionId);
+		sessionLoginRequest.setUsername(loginRequest.getUsername());
 //		session.setSessionLoginDate(dateNow);
 		
 		
-		sessionRepository.save(session);
+		sessionRepository.save(sessionLoginRequest);
 		
 	}
 	
 	@Transactional
-	public void logout(SessionLogin sessionLogin) {
+	public void logout(SessionLoginRequest sessionLoginRequest) {
 		//destroys sessionLogin
 		//SQL delete from session table where sessionLoginId = %s, sessionLogin.getSessionLoginId()
 		
