@@ -21,7 +21,6 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import com.protosyte.demo.dto.EncrypterDto;
 import com.protosyte.demo.dto.LoginRequest;
 import com.protosyte.demo.dto.RegisterRequest;
 import com.protosyte.demo.dto.SessionLoginRequest;
@@ -69,13 +68,32 @@ public class AuthService {
 //			logger.info(" -- saltStr.toString: {}",saltBAR.toString());
 			
 			byte[] hashedPw  = passwordEncryption(registerRequest.getPassword(), salt);
+			String hashedPwStr = new String(hashedPw);
 			logger.info(" -- hashedPW: {}",hashedPw);
+			logger.info(" -- hashedPWStr: {}",hashedPwStr);
 			
-			user.setPassword(hashedPw);
+			logger.info("hashcode: {}",hashedPw.hashCode());
+			
+			String hashedPwStrUtf8 = new String(new byte[]{ (byte)0x63 }, StandardCharsets.UTF_8);
+			logger.info(" -- hashedPwStrUtf8: {}",hashedPwStrUtf8);
+			String hashedPwStrISO_8859_1 = new String(new byte[]{ (byte)0x63 }, StandardCharsets.ISO_8859_1);
+			logger.info(" -- hashedPwStrISO_8859_1: {}",hashedPwStrISO_8859_1);
+			String hashedPwStrUS_ASCII = new String(new byte[]{ (byte)0x63 }, StandardCharsets.US_ASCII);
+			logger.info(" -- hashedPwStrUS_ASCII: {}",hashedPwStrUS_ASCII);
+			String hashedPwStrUTF_16 = new String(new byte[]{ (byte)0x63 }, StandardCharsets.UTF_16);
+			logger.info(" -- hashedPwStrUTF_16: {}",hashedPwStrUTF_16);
+			String hashedPwStrUTF_16BE = new String(new byte[]{ (byte)0x63 }, StandardCharsets.UTF_16BE);
+			logger.info(" -- hashedPwStrUTF_16BE: {}",hashedPwStrUTF_16BE);
+			String hashedPwStrUTF_16LE = new String(new byte[]{ (byte)0x63 }, StandardCharsets.UTF_16LE);
+			logger.info(" -- hashedPwStrUTF_16LE: {}",hashedPwStrUTF_16LE);
+			
+			user.setPassword(hashedPwStr);
 			user.setEmail(registerRequest.getEmail());
 			user.setCreated(Instant.now());
 			user.setEnabled(false);
-			user.setSalt(salt);
+			user.setSalt(new ByteArrayResource(salt));
+			
+			logger.info("saltStr: {}",hashedPwStr);
 			
 			userRepository.save(user);
 			String token = generateVerificationToken(user);
@@ -88,12 +106,11 @@ public class AuthService {
 	}
 	
 	private byte[] passwordEncryption(String password, byte[] salt) throws NoSuchAlgorithmException {
-		
 		MessageDigest md = MessageDigest.getInstance("SHA-512");
 		md.update(salt);
 		
 		byte[] hashedPassword = md.digest(password.getBytes(StandardCharsets.UTF_8));
-		logger.info(" -- hashedPW: {}",hashedPassword);
+//		logger.info(" -- hashedPW: {}",hashedPassword);
 
 		return hashedPassword;
 	}
@@ -135,9 +152,9 @@ public class AuthService {
 	public void login(LoginRequest loginRequest) {
 		//check login data == users table data. If login is successful, save a session object into session table
 		
-		String saltStr = queryFindSaltByUsername(loginRequest.getUsername());
-		if(saltStr != null) {
-			byte[] salt = saltStr.getBytes(StandardCharsets.UTF_8);
+		ByteArrayResource saltABR = queryFindSaltByUsername(loginRequest.getUsername());
+		if(saltABR.exists()) {
+			byte[] salt = saltABR.getByteArray();
 			try {
 				Boolean validLogin = queryLogin(loginRequest,salt);
 				//every page that requires authentication needs the session object passed too, along which everything else
@@ -180,15 +197,15 @@ public class AuthService {
 		}
 	}
 	
-	private String queryFindSaltByUsername(String username) {
+	private ByteArrayResource queryFindSaltByUsername(String username) {
 		StringBuilder sb = new StringBuilder();
 		sb.append(String.format("SELECT user.salt FROM user "
 				+ "WHERE user.username='%s' "
 				,username));
 		try {
 			logger.info("findSaltQuery: {}",sb.toString());
-			Query query = entityManager.createNativeQuery(sb.toString(),String.class);
-			String result = query.getSingleResult().toString();
+			Query query = entityManager.createNativeQuery(sb.toString(),ByteArrayResource.class);
+			ByteArrayResource result = (ByteArrayResource)query.getSingleResult();
 			logger.info("salt returned: {}",result);
 			return result;
 		}catch(Exception e) {

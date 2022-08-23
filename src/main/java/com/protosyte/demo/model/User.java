@@ -6,6 +6,7 @@ import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
+import javax.persistence.Lob;
 import javax.validation.constraints.Email;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotEmpty;
@@ -32,5 +33,6 @@ public class User {
 	private String email;
 	private Instant created;
 	private boolean enabled;
+	@Lob
 	private ByteArrayResource salt;
 }
